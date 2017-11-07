@@ -47,6 +47,8 @@ public:
 	std::vector<double> getLQICScores();
 	std::vector<double> getQPICScores();
 	std::vector<double> getEQPICScores();
+
+    void recomputeScores(Tree const &refTree, bool verboseOutput);
 private:
 	double log_score(size_t q1, size_t q2, size_t q3);
 	void computeQuartetScoresBifurcating();
@@ -384,7 +386,6 @@ void QuartetScoreComputer<CINT>::processNodePair(size_t uIdx, size_t vIdx) {
 	// find metaquartet indices by {u,v}
 
 	size_t lcaIdx = informationReferenceTree.lowestCommonAncestorIdx(uIdx, vIdx, rootIdx);
-
 	std::pair<size_t, size_t> innerLinks = get_path_inner_links(referenceTree.node_at(uIdx),
 			referenceTree.node_at(vIdx), referenceTree.node_at(lcaIdx));
 
@@ -711,4 +712,73 @@ QuartetScoreComputer<CINT>::QuartetScoreComputer(Tree const &refTree, const std:
 	std::cout << "Finished computing scores.\n";
 	std::cout << "It took: " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count()
 			<< " microseconds." << std::endl;
+}
+
+template<typename CINT>
+void QuartetScoreComputer<CINT>::recomputeScores(Tree const &refTree, bool verboseOutput) {
+
+    referenceTree = refTree;
+	rootIdx = referenceTree.root_node().index();
+
+	verbose = verboseOutput;
+
+	if (verbose)
+      std::cout << "Building subtree informations for reference tree..." << std::endl;
+	// precompute subtree informations
+	informationReferenceTree.init(refTree);
+	linkToEulerLeafIndex.resize(referenceTree.link_count());
+  eulerTourLeaves.clear();
+	for (auto it : eulertour(referenceTree)) {
+		if (it.node().is_leaf()) {
+			eulerTourLeaves.push_back(it.node().index());
+		}
+		linkToEulerLeafIndex[it.link().index()] = eulerTourLeaves.size();
+	}
+	size_t n = eulerTourLeaves.size();
+
+	if (verbose) {
+      std::cout << "Finished precomputing subtree informations in reference tree.\n";
+      std::cout << "The reference tree has " << n << " taxa.\n";
+  }
+
+	std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+
+	// precompute taxon ID mappings
+	// this is commented out as it was not needed anywhere in the code.
+	//taxonMapper = make_unique<TaxonMapper>(referenceTree, evaluationTrees, eulerTourLeaves);
+	//std::cout << "Finished precomputing taxon ID mappings.\n";
+
+	if (!is_bifurcating(refTree)) {
+      if (verbose)
+      std::cout << "The reference tree is multifurcating.\n";
+		LQICScores.resize(referenceTree.edge_count());
+		std::fill(LQICScores.begin(), LQICScores.end(), std::numeric_limits<double>::infinity());
+		// compute only LQ-IC scores
+		computeQuartetScoresMultifurcating();
+	} else {
+      if (verbose)
+          std::cout << "The reference tree is bifurcating.\n";
+		LQICScores.resize(referenceTree.edge_count());
+		QPICScores.resize(referenceTree.edge_count());
+		EQPICScores.resize(referenceTree.edge_count());
+		// initialize the LQ-IC, QP-IC and EQP-IC scores of all internodes (edges) to INFINITY
+		std::fill(LQICScores.begin(), LQICScores.end(), std::numeric_limits<double>::infinity());
+		std::fill(QPICScores.begin(), QPICScores.end(), std::numeric_limits<double>::infinity());
+		std::fill(EQPICScores.begin(), EQPICScores.end(), std::numeric_limits<double>::infinity());
+		// compute LQ-IC, QP-IC and EQP-IC scores
+		computeQuartetScoresBifurcating();
+		//computeQuartetScoresBifurcatingQuartets();
+	}
+
+	std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+
+	if (verbose) {
+      std::cout << "Finished computing scores.\n";
+      std::cout << "It took: " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count()
+			<< " microseconds." << std::endl;
+  }
+
+
+
+
 }

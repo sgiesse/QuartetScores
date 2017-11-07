@@ -100,6 +100,7 @@ void TreeInformation::init(Tree const &tree) {
 	firstOccurrenceInEulerTour.resize(tree.node_count());
 	std::fill(firstOccurrenceInEulerTour.begin(), firstOccurrenceInEulerTour.end(), std::numeric_limits<size_t>::max());
 
+  eulerTourNodes.clear();
 	for (auto it : eulertour(tree)) {
 		eulerTourNodes.push_back(it.node().index());
 		eulerTourLevels.push_back(dist_to_root[it.node().index()]);
