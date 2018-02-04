@@ -49,6 +49,8 @@ public:
 	std::vector<double> getEQPICScores();
 
     void recomputeScores(Tree const &refTree, bool verboseOutput);
+    void recomputeLqicForEdge(Tree const &refTree, size_t eIdx);
+    void setLQIC(size_t eIdx, double val);
 private:
 	double log_score(size_t q1, size_t q2, size_t q3);
 	void computeQuartetScoresBifurcating();
@@ -781,4 +783,53 @@ void QuartetScoreComputer<CINT>::recomputeScores(Tree const &refTree, bool verbo
 
 
 
+}
+
+
+
+template<typename CINT>
+void QuartetScoreComputer<CINT>::recomputeLqicForEdge(Tree const &refTree, size_t eIdx) {
+    referenceTree = refTree;
+    LQICScores[eIdx] = std::numeric_limits<double>::infinity();
+
+    std::vector<size_t> S1;
+    std::vector<size_t> S2;
+    using Preorder = IteratorPreorder< TreeLink const, TreeNode const, TreeEdge const >;
+
+    for(auto it = Preorder(referenceTree.edge_at(eIdx).primary_link().next() ); it != Preorder() && &it.link() != &referenceTree.edge_at(eIdx).primary_link().outer(); ++it) {
+        if (it.node().is_leaf())
+            S1.push_back( it.node().index() );
+    }
+
+    for(auto it = Preorder(referenceTree.edge_at(eIdx).secondary_link().next() ); it != Preorder() && &it.link() != &referenceTree.edge_at(eIdx).secondary_link().outer(); ++it) {
+        if (it.node().is_leaf())
+            S2.push_back( it.node().index() );
+    }
+
+    for (size_t i = 0; i < S1.size(); ++i) {
+        std::cout << S1[i] << " ";
+    } std::cout << std::endl;
+
+    for (size_t i = 0; i < S2.size(); ++i) {
+        std::cout << S2[i] << " ";
+    } std::cout << std::endl;
+
+    for (size_t aIdx = 0; aIdx < S1.size(); ++aIdx) {
+        for (size_t bIdx = aIdx+1; bIdx < S1.size(); ++bIdx) {
+            for (size_t cIdx = 0; cIdx < S2.size(); ++cIdx) {
+                for (size_t dIdx = cIdx+1; dIdx < S2.size(); ++dIdx) {
+                    std::tuple<CINT, CINT, CINT> quartetOccurrences = countQuartetOccurrences(S1[aIdx], S1[bIdx], S2[cIdx], S2[dIdx]);
+                    double qic = log_score(std::get<0>(quartetOccurrences), std::get<1>(quartetOccurrences), std::get<2>(quartetOccurrences));
+                    //std::cout << std::get<0>(quartetOccurrences) << " " << std::get<1>(quartetOccurrences) << " " << std::get<2>(quartetOccurrences) << " " << qic << std::endl;
+                    LQICScores[eIdx] = std::min(LQICScores[eIdx], qic);
+                }
+            }
+        }
+    }
+}
+
+
+template<typename CINT>
+void QuartetScoreComputer<CINT>::setLQIC(size_t eIdx, double val) {
+    LQICScores[eIdx] = val;
 }
