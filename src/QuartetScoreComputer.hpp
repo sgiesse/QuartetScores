@@ -806,14 +806,6 @@ void QuartetScoreComputer<CINT>::recomputeLqicForEdge(Tree const &refTree, size_
             S2.push_back( it.node().index() );
     }
 
-    for (size_t i = 0; i < S1.size(); ++i) {
-        std::cout << S1[i] << " ";
-    } std::cout << std::endl;
-
-    for (size_t i = 0; i < S2.size(); ++i) {
-        std::cout << S2[i] << " ";
-    } std::cout << std::endl;
-
     for (size_t aIdx = 0; aIdx < S1.size(); ++aIdx) {
         for (size_t bIdx = aIdx+1; bIdx < S1.size(); ++bIdx) {
             for (size_t cIdx = 0; cIdx < S2.size(); ++cIdx) {
