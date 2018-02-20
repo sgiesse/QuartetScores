@@ -805,14 +805,14 @@ void QuartetScoreComputer<CINT>::recomputeLqicForEdge(Tree const &refTree, size_
         if (it.node().is_leaf())
             S2.push_back( it.node().index() );
     }
-
+#pragma omp parallel for schedule(dynamic)
     for (size_t aIdx = 0; aIdx < S1.size(); ++aIdx) {
         for (size_t bIdx = aIdx+1; bIdx < S1.size(); ++bIdx) {
             for (size_t cIdx = 0; cIdx < S2.size(); ++cIdx) {
                 for (size_t dIdx = cIdx+1; dIdx < S2.size(); ++dIdx) {
                     std::tuple<CINT, CINT, CINT> quartetOccurrences = countQuartetOccurrences(S1[aIdx], S1[bIdx], S2[cIdx], S2[dIdx]);
                     double qic = log_score(std::get<0>(quartetOccurrences), std::get<1>(quartetOccurrences), std::get<2>(quartetOccurrences));
-                    //std::cout << std::get<0>(quartetOccurrences) << " " << std::get<1>(quartetOccurrences) << " " << std::get<2>(quartetOccurrences) << " " << qic << std::endl;
+#pragma omp critical
                     LQICScores[eIdx] = std::min(LQICScores[eIdx], qic);
                 }
             }
