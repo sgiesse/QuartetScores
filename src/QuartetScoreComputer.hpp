@@ -51,6 +51,9 @@ public:
     void recomputeScores(Tree const &refTree, bool verboseOutput);
     void recomputeLqicForEdge(Tree const &refTree, size_t eIdx);
     void setLQIC(size_t eIdx, double val);
+
+    void enableCache();
+    void disableCache();
 private:
 	double log_score(size_t q1, size_t q2, size_t q3);
 	void computeQuartetScoresBifurcating();
@@ -79,6 +82,9 @@ private:
 	std::vector<size_t> linkToEulerLeafIndex;
 
 	std::unique_ptr<QuartetCounterLookup<CINT>> quartetCounterLookup;
+
+	bool cached;
+	std::unordered_map<std::string, double> hashtable;
 };
 
 /**
@@ -805,6 +811,24 @@ void QuartetScoreComputer<CINT>::recomputeLqicForEdge(Tree const &refTree, size_
         if (it.node().is_leaf())
             S2.push_back( it.node().index() );
     }
+
+    bool cachedAndFound = false;
+    std::string hash;
+    if (cached) {
+		std::sort(S2.begin(), S2.end());
+
+	    for (auto const& s : S1) hash += s;
+	    hash += "|";
+	    for (auto const& s : S2) hash += s;
+
+	    if (hashtable.find(hash) != hashtable.end()) {
+			setLQIC(eIdx, hashtable[hash]);
+			cachedAndFound = true;
+	    }
+    }
+
+    if (cachedAndFound) return;
+
 #pragma omp parallel for schedule(dynamic)
     for (size_t aIdx = 0; aIdx < S1.size(); ++aIdx) {
         for (size_t bIdx = aIdx+1; bIdx < S1.size(); ++bIdx) {
@@ -818,10 +842,22 @@ void QuartetScoreComputer<CINT>::recomputeLqicForEdge(Tree const &refTree, size_
             }
         }
     }
+
+    if (cached) hashtable[hash] = LQICScores[eIdx];
 }
 
 
 template<typename CINT>
 void QuartetScoreComputer<CINT>::setLQIC(size_t eIdx, double val) {
     LQICScores[eIdx] = val;
+}
+
+template<typename CINT>
+void QuartetScoreComputer<CINT>::enableCache() {
+	cached = true;
+}
+
+template<typename CINT>
+void QuartetScoreComputer<CINT>::disableCache() {
+	cached = false;
 }
