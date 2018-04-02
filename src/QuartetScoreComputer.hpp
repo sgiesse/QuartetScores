@@ -685,8 +685,8 @@ QuartetScoreComputer<CINT>::QuartetScoreComputer(Tree const &refTree, const std:
 	std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
 
 	std::cout << "Finished counting quartets.\n";
-	std::cout << "It took: " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count()
-			<< " microseconds." << std::endl;
+	std::cout << "It took: " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() * 0.000001
+			<< " seconds." << std::endl;
 
 	begin = std::chrono::steady_clock::now();
 
@@ -718,8 +718,8 @@ QuartetScoreComputer<CINT>::QuartetScoreComputer(Tree const &refTree, const std:
 	end = std::chrono::steady_clock::now();
 
 	std::cout << "Finished computing scores.\n";
-	std::cout << "It took: " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count()
-			<< " microseconds." << std::endl;
+	std::cout << "It took: " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() * 0.000001
+			<< " seconds." << std::endl;
 }
 
 template<typename CINT>
@@ -815,6 +815,7 @@ void QuartetScoreComputer<CINT>::recomputeLqicForEdge(Tree const &refTree, size_
     bool cachedAndFound = false;
     std::string hash;
     if (cached) {
+		std::sort(S1.begin(), S1.end());
 		std::sort(S2.begin(), S2.end());
 
 	    for (auto const& s : S1) hash += s;
@@ -826,7 +827,6 @@ void QuartetScoreComputer<CINT>::recomputeLqicForEdge(Tree const &refTree, size_
 			cachedAndFound = true;
 	    }
     }
-
     if (cachedAndFound) return;
 
 #pragma omp parallel for schedule(dynamic)
@@ -855,6 +855,7 @@ void QuartetScoreComputer<CINT>::setLQIC(size_t eIdx, double val) {
 template<typename CINT>
 void QuartetScoreComputer<CINT>::enableCache() {
 	cached = true;
+	hashtable.reserve(100000);
 }
 
 template<typename CINT>
