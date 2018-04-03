@@ -50,6 +50,7 @@ public:
 
     void recomputeScores(Tree const &refTree, bool verboseOutput);
     void recomputeLqicForEdge(Tree const &refTree, size_t eIdx);
+    void recomputeLqicForEdge(size_t eIdx);
     void setLQIC(size_t eIdx, double val);
 
     void enableCache();
@@ -84,7 +85,7 @@ private:
 	std::unique_ptr<QuartetCounterLookup<CINT>> quartetCounterLookup;
 
 	bool cached;
-	std::unordered_map<std::string, double> hashtable;
+	std::unordered_map<std::wstring, double> hashtable;
 };
 
 /**
@@ -791,11 +792,14 @@ void QuartetScoreComputer<CINT>::recomputeScores(Tree const &refTree, bool verbo
 
 }
 
-
-
 template<typename CINT>
 void QuartetScoreComputer<CINT>::recomputeLqicForEdge(Tree const &refTree, size_t eIdx) {
     referenceTree = refTree;
+    recomputeLqicForEdge(eIdx);
+}
+
+template<typename CINT>
+void QuartetScoreComputer<CINT>::recomputeLqicForEdge(size_t eIdx) {
     LQICScores[eIdx] = std::numeric_limits<double>::infinity();
 
     std::vector<size_t> S1;
@@ -813,13 +817,13 @@ void QuartetScoreComputer<CINT>::recomputeLqicForEdge(Tree const &refTree, size_
     }
 
     bool cachedAndFound = false;
-    std::string hash;
+    std::wstring hash;
     if (cached) {
 		std::sort(S1.begin(), S1.end());
 		std::sort(S2.begin(), S2.end());
 
 	    for (auto const& s : S1) hash += s;
-	    hash += "|";
+	    hash += '|';
 	    for (auto const& s : S2) hash += s;
 
 	    if (hashtable.find(hash) != hashtable.end()) {
