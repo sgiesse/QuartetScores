@@ -822,9 +822,9 @@ void QuartetScoreComputer<CINT>::recomputeLqicForEdge(size_t eIdx) {
 		std::sort(S1.begin(), S1.end());
 		std::sort(S2.begin(), S2.end());
 
-	    for (auto const& s : S1) hash += s;
-	    hash += '|';
-	    for (auto const& s : S2) hash += s;
+	    if (S1[0] <= S2[0]) for (auto const& s : S1) hash += s;
+	    hash += 0xffff;
+	    if (S1[0] > S2[0]) for (auto const& s : S2) hash += s;
 
 	    if (hashtable.find(hash) != hashtable.end()) {
 			setLQIC(eIdx, hashtable[hash]);
@@ -849,7 +849,6 @@ void QuartetScoreComputer<CINT>::recomputeLqicForEdge(size_t eIdx) {
 
     if (cached) hashtable[hash] = LQICScores[eIdx];
 }
-
 
 template<typename CINT>
 void QuartetScoreComputer<CINT>::setLQIC(size_t eIdx, double val) {
