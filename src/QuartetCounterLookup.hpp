@@ -27,6 +27,7 @@ public:
 	QuartetCounterLookup(const Tree &refTree, const std::string &evalTreesPath, size_t m, bool savemem);
 	~QuartetCounterLookup() = default;
 	std::tuple<CINT, CINT, CINT> countQuartetOccurrences(size_t aIdx, size_t bIdx, size_t cIdx, size_t dIdx) const;
+	void changeReferenceTree(const Tree& refTree);
 private:
 	void countQuartets(const std::string &evalTreesPath, size_t m,
 			const std::unordered_map<std::string, size_t> &taxonToReferenceID);
@@ -50,6 +51,7 @@ private:
 	size_t n_cube; /**> n*n*n */
 	std::vector<size_t> refIdToLookupID;
 	bool savemem; /**> trade speed for less memory or not */
+	std::unordered_map<std::string, size_t> taxonToReferenceID;
 };
 
 /**
@@ -214,7 +216,8 @@ void QuartetCounterLookup<CINT>::countQuartets(const std::string &evalTreesPath,
 		for (auto it : eulertour(tree)) {
 			if (it.node().is_leaf()) {
 				size_t leafIdx = it.node().index();
-				eulerTourLeaves.push_back(
+				//if (taxonToReferenceID.find(tree.node_at(leafIdx).data<DefaultNodeData>().name) != taxonToReferenceID.end())
+					eulerTourLeaves.push_back(
 						refIdToLookupID[taxonToReferenceID.at(tree.node_at(leafIdx).data<DefaultNodeData>().name)]);
 			}
 			linkToEulerLeafIndex[it.link().index()] = eulerTourLeaves.size();
@@ -246,7 +249,7 @@ template<typename CINT>
 QuartetCounterLookup<CINT>::QuartetCounterLookup(Tree const &refTree, const std::string &evalTreesPath, size_t m,
 		bool savemem) :
 		savemem(savemem) {
-	std::unordered_map<std::string, size_t> taxonToReferenceID;
+	//std::unordered_map<std::string, size_t> taxonToReferenceID;
 	refIdToLookupID.resize(refTree.node_count());
 	n = 0;
 	for (auto it : eulertour(refTree)) {
@@ -315,4 +318,34 @@ std::tuple<CINT, CINT, CINT> QuartetCounterLookup<CINT>::countQuartetOccurrences
 		CINT adBC = lookupQuartetCount(aIdx, dIdx, bIdx, cIdx);
 		return std::tuple<CINT, CINT, CINT>(abCD, acBD, adBC);
 	}
+}
+
+template<typename CINT>
+void QuartetCounterLookup<CINT>::changeReferenceTree(const Tree& refTree) {
+	std::vector<size_t> refIdToLookupID_new;
+	std::unordered_map<std::string, size_t> taxonToReferenceID_new;
+
+	//refIdToLookupID_new.resize(refTree.node_count());
+	refIdToLookupID_new.resize(refIdToLookupID.size());
+	n = 0;
+	for (auto it : eulertour(refTree)) {
+		if (it.node().is_leaf()) {
+			taxonToReferenceID_new[it.node().data<DefaultNodeData>().name] = it.node().index();
+			n++;
+		}
+	}
+
+	size_t m = refTree.node_count();
+	for (const auto& x : taxonToReferenceID) {
+		if (taxonToReferenceID_new.find(x.first) == taxonToReferenceID_new.end()) {
+			taxonToReferenceID_new[x.first] = m++;
+		}
+	}
+
+	for (const auto& x: taxonToReferenceID_new) {
+	    refIdToLookupID_new[x.second] = refIdToLookupID[taxonToReferenceID[x.first]];
+	}
+
+	taxonToReferenceID = taxonToReferenceID_new;
+	refIdToLookupID = refIdToLookupID_new;
 }

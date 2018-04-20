@@ -727,6 +727,7 @@ template<typename CINT>
 void QuartetScoreComputer<CINT>::recomputeScores(Tree const &refTree, bool verboseOutput) {
 
     referenceTree = refTree;
+    quartetCounterLookup->changeReferenceTree(referenceTree);
 	rootIdx = referenceTree.root_node().index();
 
 	verbose = verboseOutput;
@@ -735,6 +736,7 @@ void QuartetScoreComputer<CINT>::recomputeScores(Tree const &refTree, bool verbo
       std::cout << "Building subtree informations for reference tree..." << std::endl;
 	// precompute subtree informations
 	informationReferenceTree.init(refTree);
+	linkToEulerLeafIndex.clear();
 	linkToEulerLeafIndex.resize(referenceTree.link_count());
   eulerTourLeaves.clear();
 	for (auto it : eulertour(referenceTree)) {
