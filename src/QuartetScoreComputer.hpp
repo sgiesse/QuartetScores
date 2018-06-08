@@ -26,7 +26,7 @@ using namespace tree;
 using namespace utils;
 
 /**
- * Hash a std::pair.
+ * Hasexport CC=/cm/shared/apps/gcc/4.8.1/bin/gcch a std::pair.
  */
 struct pairhash {
 public:
@@ -51,7 +51,13 @@ public:
     void recomputeScores(Tree const &refTree, bool verboseOutput);
     void recomputeLqicForEdge(Tree const &refTree, size_t eIdx);
     void recomputeLqicForEdge(size_t eIdx);
+    void recomputeQpicForEdge(Tree const &refTree, size_t eIdx);
+    void recomputeQpicForEdge(size_t eIdx);
+    void recomputeEqpicForEdge(Tree const &refTree, size_t eIdx);
+    void recomputeEqpicForEdge(size_t eIdx);
     void setLQIC(size_t eIdx, double val);
+    void setQPIC(size_t eIdx, double val);
+    void setEQPIC(size_t eIdx, double val);
 
     void enableCache();
     void disableCache();
@@ -69,6 +75,9 @@ private:
 
 	std::pair<size_t, size_t> subtreeLeafIndices(size_t linkIdx);
 
+    double recomputeQpicForMetaquartet(std::vector<size_t>& S1, std::vector<size_t>& S2, std::vector<size_t>& S3, std::vector<size_t>& S4);
+    std::tuple<std::vector<size_t>, std::vector<size_t>, std::vector<size_t>, std::vector<size_t> > metaquartet(size_t linku, size_t linkv);
+
 	Tree referenceTree; /**< the reference tree */
 	size_t rootIdx; /**< ID of the genesis root node in the reference tree */
 
@@ -85,7 +94,8 @@ private:
 	std::unique_ptr<QuartetCounterLookup<CINT>> quartetCounterLookup;
 
 	bool cached;
-	std::unordered_map<std::wstring, double> hashtable;
+    std::unordered_map<std::wstring, double> hashtableLQIC;
+    std::unordered_map<std::wstring, double> hashtableQPIC;
 };
 
 /**
@@ -821,17 +831,19 @@ void QuartetScoreComputer<CINT>::recomputeLqicForEdge(size_t eIdx) {
     bool cachedAndFound = false;
     std::wstring hash;
     if (cached) {
-		std::sort(S1.begin(), S1.end());
-		std::sort(S2.begin(), S2.end());
+        std::sort(S1.begin(), S1.end());
+        std::sort(S2.begin(), S2.end());
 
-	    if (S1[0] <= S2[0]) for (auto const& s : S1) hash += s;
-	    hash += 0xffff;
-	    if (S1[0] > S2[0]) for (auto const& s : S2) hash += s;
+        if (S1[0] <= S2[0]) for (auto const& s : S1) hash += s;
+        else for (auto const& s : S2) hash += s;
+        hash += 0xffff;
+        if (S1[0] > S2[0]) for (auto const& s : S2) hash += s;
+        else for (auto const& s : S1) hash += s;
 
-	    if (hashtable.find(hash) != hashtable.end()) {
-			setLQIC(eIdx, hashtable[hash]);
-			cachedAndFound = true;
-	    }
+        if (hashtableLQIC.find(hash) != hashtableLQIC.end()) {
+            setLQIC(eIdx, hashtableLQIC[hash]);
+            cachedAndFound = true;
+        }
     }
     if (cachedAndFound) return;
 
@@ -852,7 +864,7 @@ void QuartetScoreComputer<CINT>::recomputeLqicForEdge(size_t eIdx) {
 
     LQICScores[eIdx] = lqic;
     
-    if (cached) hashtable[hash] = LQICScores[eIdx];
+    if (cached) hashtableLQIC[hash] = LQICScores[eIdx];
 }
 
 template<typename CINT>
@@ -861,12 +873,195 @@ void QuartetScoreComputer<CINT>::setLQIC(size_t eIdx, double val) {
 }
 
 template<typename CINT>
+void QuartetScoreComputer<CINT>::setQPIC(size_t eIdx, double val) {
+    QPICScores[eIdx] = val;
+}
+
+template<typename CINT>
+void QuartetScoreComputer<CINT>::setEQPIC(size_t eIdx, double val) {
+    EQPICScores[eIdx] = val;
+}
+
+template<typename CINT>
 void QuartetScoreComputer<CINT>::enableCache() {
 	cached = true;
-	hashtable.reserve(100000);
+	hashtableLQIC.reserve(100000);
 }
 
 template<typename CINT>
 void QuartetScoreComputer<CINT>::disableCache() {
 	cached = false;
+}
+
+template<typename CINT>
+void QuartetScoreComputer<CINT>::recomputeQpicForEdge(Tree const &refTree, size_t eIdx) {
+    referenceTree = refTree;
+    informationReferenceTree.init(refTree);
+    recomputeQpicForEdge(eIdx);
+}
+
+template<typename CINT>
+void QuartetScoreComputer<CINT>::recomputeQpicForEdge(size_t eIdx) {
+    if (!(referenceTree.edge_at(eIdx).primary_link().node().is_inner() && referenceTree.edge_at(eIdx).secondary_link().node().is_inner())) {
+        QPICScores[eIdx] = std::numeric_limits<double>::infinity();
+        return;
+    }
+
+    auto metaq = metaquartet(referenceTree.edge_at(eIdx).primary_link().index(), referenceTree.edge_at(eIdx).secondary_link().index());
+
+    QPICScores[eIdx] = recomputeQpicForMetaquartet(std::get<0>(metaq), std::get<1>(metaq), std::get<2>(metaq), std::get<3>(metaq));
+}
+
+template<typename CINT>
+std::tuple<std::vector<size_t>, std::vector<size_t>, std::vector<size_t>, std::vector<size_t> > QuartetScoreComputer<CINT>::metaquartet(size_t linku, size_t linkv) {
+    std::vector<size_t> S1;
+    std::vector<size_t> S2;
+    std::vector<size_t> S3;
+    std::vector<size_t> S4;
+    using Preorder = IteratorPreorder< TreeLink const, TreeNode const, TreeEdge const >;
+
+    for (auto it = Preorder(referenceTree.link_at(linku).next().outer().next()); it != Preorder() && &it.node() != &referenceTree.link_at(linku).node(); ++it) {
+        if (it.node().is_leaf())
+            S1.push_back( it.node().index() );
+    }
+
+    for (auto it = Preorder(referenceTree.link_at(linku).next().next().outer().next()); it != Preorder() && &it.node() != &referenceTree.link_at(linku).node(); ++it) {
+        if (it.node().is_leaf())
+            S2.push_back( it.node().index() );
+    }
+
+    for (auto it = Preorder(referenceTree.link_at(linkv).next().outer().next()); it != Preorder() && &it.node() != &referenceTree.link_at(linkv).node(); ++it) {
+        if (it.node().is_leaf())
+            S3.push_back( it.node().index() );
+    }
+
+    for (auto it = Preorder(referenceTree.link_at(linkv).next().next().outer().next()); it != Preorder() && &it.node() != &referenceTree.link_at(linkv).node(); ++it) {
+        if (it.node().is_leaf())
+            S4.push_back( it.node().index() );
+    }
+
+    return std::make_tuple(S1, S2, S3, S4);
+}
+
+template<typename CINT>
+double QuartetScoreComputer<CINT>::recomputeQpicForMetaquartet(std::vector<size_t>& S1, std::vector<size_t>& S2, std::vector<size_t>& S3, std::vector<size_t>& S4) {
+
+    std::wstring hash;
+    if (cached) {
+        hash.reserve(S1.size() + S2.size() + S3.size() + S4.size() + 3);
+        std::sort(S1.begin(), S1.end());
+        std::sort(S2.begin(), S2.end());
+        std::sort(S3.begin(), S3.end());
+        std::sort(S4.begin(), S4.end());
+
+        if (S1[0] > S2[0]) std::swap(S1, S2);
+        if (S3[0] > S4[0]) std::swap(S3, S4);
+
+        for (auto const& s : S1) hash += s;
+        hash += 0xffff;
+        for (auto const& s : S2) hash += s;
+        hash += 0xffff;
+        for (auto const& s : S3) hash += s;
+        hash += 0xffff;
+        for (auto const& s : S4) hash += s;
+
+        if (hashtableQPIC.find(hash) != hashtableQPIC.end()) {
+            return hashtableQPIC[hash];
+        }
+    }
+
+    unsigned p1, p2, p3;
+    p1 = p2 = p3 = 0;
+    if (S1.size() < S2.size()) std::swap(S1, S2);
+    //LOG_INFO << "S1.size() = " << S1.size() << std::endl;
+#pragma omp parallel for schedule(dynamic) reduction(+:p1,p2,p3)
+    for (size_t aIdx = 0; aIdx < S1.size(); ++aIdx) {
+        for (size_t bIdx = 0; bIdx < S2.size(); ++bIdx) {
+            for (size_t cIdx = 0; cIdx < S3.size(); ++cIdx) {
+                for (size_t dIdx = 0; dIdx < S4.size(); ++dIdx) {
+
+                    std::tuple<CINT, CINT, CINT> quartetOccurrences = countQuartetOccurrences(S1[aIdx], S2[bIdx], S3[cIdx], S4[dIdx]);
+                    p1 += std::get<0>(quartetOccurrences);
+                    p2 += std::get<1>(quartetOccurrences);
+                    p3 += std::get<2>(quartetOccurrences);
+                }
+            }
+        }
+    }
+
+    double qpic = log_score(p1, p2, p3);
+    if (cached) hashtableQPIC[hash] = qpic;
+    return qpic;
+}
+
+
+template<typename CINT>
+void QuartetScoreComputer<CINT>::recomputeEqpicForEdge(Tree const &refTree, size_t eIdx) {
+    referenceTree = refTree;
+    informationReferenceTree.init(refTree);
+    recomputeEqpicForEdge(eIdx);
+}
+
+template<typename CINT>
+void QuartetScoreComputer<CINT>::recomputeEqpicForEdge(size_t eIdx) {
+    EQPICScores[eIdx] = std::numeric_limits<double>::infinity();
+
+    std::vector<size_t> S1;
+    std::vector<size_t> S2;
+    using Preorder = IteratorPreorder< TreeLink const, TreeNode const, TreeEdge const >;
+
+    for(auto it = Preorder(referenceTree.edge_at(eIdx).primary_link().next() ); it != Preorder() && &it.link() != &referenceTree.edge_at(eIdx).primary_link().outer(); ++it) {
+        if (!it.node().is_leaf())
+            S1.push_back( it.node().index() );
+    }
+
+    for(auto it = Preorder(referenceTree.edge_at(eIdx).secondary_link().next() ); it != Preorder() && &it.link() != &referenceTree.edge_at(eIdx).secondary_link().outer(); ++it) {
+        if (!it.node().is_leaf())
+            S2.push_back( it.node().index() );
+    }
+    
+    for (size_t i = 0; i < S1.size(); ++i) {
+        for (size_t j = 0; j < S2.size(); ++j) {
+            size_t lcaFromToIdx = informationReferenceTree.lowestCommonAncestorIdx(S1[i], S2[j], rootIdx);
+            size_t link_u, link_v;
+
+            if (S1[i] == rootIdx) {
+                link_v = referenceTree.node_at(S2[j]).link().index();
+                if (informationReferenceTree.lowestCommonAncestorIdx(referenceTree.node_at(S1[i]).link().outer().node().index(), S2[j], rootIdx) != lcaFromToIdx)
+                    link_u = referenceTree.node_at(S1[i]).link().index();
+                else if (informationReferenceTree.lowestCommonAncestorIdx(referenceTree.node_at(S1[i]).link().next().outer().node().index(), S2[j], rootIdx) != lcaFromToIdx)
+                    link_u = referenceTree.node_at(S1[i]).link().next().index();
+                else if (informationReferenceTree.lowestCommonAncestorIdx(referenceTree.node_at(S1[i]).link().next().next().outer().node().index(), S2[j], rootIdx) != lcaFromToIdx)
+                    link_u = referenceTree.node_at(S1[i]).link().next().next().index();
+            } else if (S2[j] == rootIdx) {
+                link_u = referenceTree.node_at(S1[i]).link().index();
+                if (informationReferenceTree.lowestCommonAncestorIdx(referenceTree.node_at(S2[j]).link().outer().node().index(), S1[i], rootIdx) != lcaFromToIdx)
+                    link_v = referenceTree.node_at(S2[j]).link().index();
+                else if (informationReferenceTree.lowestCommonAncestorIdx(referenceTree.node_at(S2[j]).link().next().outer().node().index(), S1[i], rootIdx) != lcaFromToIdx)
+                    link_v = referenceTree.node_at(S2[j]).link().next().index();
+                else if (informationReferenceTree.lowestCommonAncestorIdx(referenceTree.node_at(S2[j]).link().next().next().outer().node().index(), S1[i], rootIdx) != lcaFromToIdx)
+                    link_v = referenceTree.node_at(S2[j]).link().next().next().index();
+            } else if (lcaFromToIdx == rootIdx) {
+                link_u = referenceTree.node_at(S1[i]).link().index();
+                link_v = referenceTree.node_at(S2[j]).link().index();
+            } else if (lcaFromToIdx == S1[i]) {
+                link_v = referenceTree.node_at(S2[j]).link().index();
+                if (informationReferenceTree.lowestCommonAncestorIdx(referenceTree.node_at(S1[i]).link().next().outer().node().index(), S2[j], rootIdx) == lcaFromToIdx)
+                    link_u = referenceTree.node_at(S1[i]).link().next().next().index();
+                else link_u = referenceTree.node_at(S1[i]).link().next().index();
+            } else if (lcaFromToIdx == S1[i]) {
+                link_u = referenceTree.node_at(S1[i]).link().index();
+                if (informationReferenceTree.lowestCommonAncestorIdx(referenceTree.node_at(S2[j]).link().next().outer().node().index(), S1[i], rootIdx) == lcaFromToIdx)
+                    link_u = referenceTree.node_at(S2[j]).link().next().next().index();
+                else link_u = referenceTree.node_at(S2[j]).link().next().index();
+            } else {
+                link_u = referenceTree.node_at(S1[i]).link().index();
+                link_v = referenceTree.node_at(S2[j]).link().index();
+            }
+
+            auto metaq = metaquartet(link_u, link_v);
+            double qpic = recomputeQpicForMetaquartet(std::get<0>(metaq), std::get<1>(metaq), std::get<2>(metaq), std::get<3>(metaq));
+            EQPICScores[eIdx] = std::min(EQPICScores[eIdx], qpic);
+        }
+    }
 }
