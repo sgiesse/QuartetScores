@@ -230,14 +230,26 @@ void QuartetCounterLookup<CINT>::countQuartets(const std::string &evalTreesPath,
 			}
 		}
 
-		if (i > progress * onePercent) {
-			std::cout << "Counting quartets... " << progress << "%" << std::endl;
-			progress++;
-		}
+    if (i > progress * onePercent) {
+        //std::cout << "Counting quartets... " << progress << "%" << std::endl;
 
-		++itTree;
-		++i;
-	}
+        int barWidth = 50;
+        std::cout << "Counting quartets [";
+        int pos = barWidth * progress/100.0;
+        for (int i = 0; i < barWidth; ++i) {
+            if (i < pos) std::cout << "=";
+            else if (i == pos) std::cout << ">";
+            else std::cout << " ";
+        }
+        std::cout << "] " << int(progress) << " %\r" << std::flush;
+
+        progress++;
+    }
+
+    ++itTree;
+    ++i;
+  }
+  std::cout << std::endl;
 }
 
 /**
