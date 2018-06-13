@@ -440,6 +440,8 @@ void QuartetScoreComputer<CINT>::processNodePair(size_t uIdx, size_t vIdx) {
 					size_t bIdx = eulerTourLeaves[bLeafIndex];
 					size_t cIdx = eulerTourLeaves[cLeafIndex];
 					size_t dIdx = eulerTourLeaves[dLeafIndex];
+          if (aIdx == bIdx or aIdx == cIdx or aIdx == dIdx or bIdx == cIdx or bIdx == dIdx or cIdx == dIdx)
+              throw std::runtime_error("Invalid Quartet");
 
 					// process the quartet (a,b,c,d)
 					// We already know by the way we defined S1,S2,S3,S4 that the reference tree has the quartet topology ab|cd
@@ -738,6 +740,7 @@ void QuartetScoreComputer<CINT>::recomputeScores(Tree const &refTree, bool verbo
 
     referenceTree = refTree;
     quartetCounterLookup->changeReferenceTree(referenceTree);
+    countBuffer.clear();
 	rootIdx = referenceTree.root_node().index();
 
 	verbose = verboseOutput;

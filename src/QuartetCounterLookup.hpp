@@ -315,10 +315,10 @@ template<typename CINT>
 std::tuple<CINT, CINT, CINT> QuartetCounterLookup<CINT>::countQuartetOccurrences(size_t aIdx, size_t bIdx, size_t cIdx,
 		size_t dIdx) const {
 	if (savemem) {
-		size_t a = refIdToLookupID[aIdx];
-		size_t b = refIdToLookupID[bIdx];
-		size_t c = refIdToLookupID[cIdx];
-		size_t d = refIdToLookupID[dIdx];
+      size_t a = refIdToLookupID[aIdx];
+      size_t b = refIdToLookupID[bIdx];
+      size_t c = refIdToLookupID[cIdx];
+      size_t d = refIdToLookupID[dIdx];
 		const auto& tuple = lookupTable.get_tuple(a, b, c, d);
 		CINT abCD = tuple[lookupTable.tuple_index(a, b, c, d)];
 		CINT acBD = tuple[lookupTable.tuple_index(a, c, b, d)];
@@ -338,14 +338,16 @@ void QuartetCounterLookup<CINT>::changeReferenceTree(const Tree& refTree) {
 	std::unordered_map<std::string, size_t> taxonToReferenceID_new;
 
 	//refIdToLookupID_new.resize(refTree.node_count());
-	refIdToLookupID_new.resize(refIdToLookupID.size());
-	n = 0;
+	//refIdToLookupID_new.resize(refIdToLookupID.size());
+  refIdToLookupID_new.resize(std::max(refTree.node_count(), refIdToLookupID.size()));
+	size_t n_ = 0;
 	for (auto it : eulertour(refTree)) {
 		if (it.node().is_leaf()) {
 			taxonToReferenceID_new[it.node().data<DefaultNodeData>().name] = it.node().index();
-			n++;
+			n_++;
 		}
 	}
+  if (n_ > n) throw std::runtime_error("New reference tree has more leaves than previous reference tree.");
 
 	size_t m = refTree.node_count();
 	for (const auto& x : taxonToReferenceID) {
