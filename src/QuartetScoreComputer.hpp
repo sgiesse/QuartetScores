@@ -44,6 +44,7 @@ class QuartetScoreComputer {
 public:
 	QuartetScoreComputer(Tree const &refTree, const std::string &evalTreesPath, size_t m, bool verboseOutput,
 			bool enforceSmallMem);
+    QuartetScoreComputer(Tree const &refTree, QuartetCounterLookup<CINT>& qcl, bool verboseOutput);
 	std::vector<double> getLQICScores();
 	std::vector<double> getQPICScores();
 	std::vector<double> getEQPICScores();
@@ -734,6 +735,66 @@ QuartetScoreComputer<CINT>::QuartetScoreComputer(Tree const &refTree, const std:
 	std::cout << "It took: " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() * 0.000001
 			<< " seconds." << std::endl;
 }
+
+template<typename CINT>
+QuartetScoreComputer<CINT>::QuartetScoreComputer(Tree const &refTree, QuartetCounterLookup<CINT>& qcl, bool verboseOutput) {
+	referenceTree = refTree;
+	rootIdx = referenceTree.root_node().index();
+
+	verbose = verboseOutput;
+
+	std::cout << "Building subtree informations for reference tree..." << std::endl;
+	// precompute subtree informations
+	informationReferenceTree.init(refTree);
+	linkToEulerLeafIndex.resize(referenceTree.link_count());
+	for (auto it : eulertour(referenceTree)) {
+		if (it.node().is_leaf()) {
+			eulerTourLeaves.push_back(it.node().index());
+		}
+		linkToEulerLeafIndex[it.link().index()] = eulerTourLeaves.size();
+	}
+	size_t n = eulerTourLeaves.size();
+
+	std::cout << "Finished precomputing subtree informations in reference tree.\n";
+	std::cout << "The reference tree has " << n << " taxa.\n";
+
+  quartetCounterLookup = qcl;
+  quartetCounterLookup->changeReferenceTree(referenceTree);
+
+	std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+
+	// precompute taxon ID mappings
+	// this is commented out as it was not needed anywhere in the code.
+	//taxonMapper = make_unique<TaxonMapper>(referenceTree, evaluationTrees, eulerTourLeaves);
+	//std::cout << "Finished precomputing taxon ID mappings.\n";
+
+	if (!is_bifurcating(refTree)) {
+		std::cout << "The reference tree is multifurcating.\n";
+		LQICScores.resize(referenceTree.edge_count());
+		std::fill(LQICScores.begin(), LQICScores.end(), std::numeric_limits<double>::infinity());
+		// compute only LQ-IC scores
+		computeQuartetScoresMultifurcating();
+	} else {
+		std::cout << "The reference tree is bifurcating.\n";
+		LQICScores.resize(referenceTree.edge_count());
+		QPICScores.resize(referenceTree.edge_count());
+		EQPICScores.resize(referenceTree.edge_count());
+		// initialize the LQ-IC, QP-IC and EQP-IC scores of all internodes (edges) to INFINITY
+		std::fill(LQICScores.begin(), LQICScores.end(), std::numeric_limits<double>::infinity());
+		std::fill(QPICScores.begin(), QPICScores.end(), std::numeric_limits<double>::infinity());
+		std::fill(EQPICScores.begin(), EQPICScores.end(), std::numeric_limits<double>::infinity());
+		// compute LQ-IC, QP-IC and EQP-IC scores
+		computeQuartetScoresBifurcating();
+		//computeQuartetScoresBifurcatingQuartets();
+	}
+
+	std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+
+	std::cout << "Finished computing scores.\n";
+	std::cout << "It took: " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() * 0.000001
+			<< " seconds." << std::endl;
+}
+
 
 template<typename CINT>
 void QuartetScoreComputer<CINT>::recomputeScores(Tree const &refTree, bool verboseOutput) {
